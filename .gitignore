@@ -1,0 +1,5 @@
+panels.conf
+apks/
+*.log
+.DS_Store
+run-debloat-14-and-remove-thomas.sh

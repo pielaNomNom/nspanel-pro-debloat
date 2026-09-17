@@ -1,0 +1,6 @@
+# Copy to panels.conf (gitignored) to pre-seed known panel IPs so
+# "Discover" connects to them directly instead of waiting on the subnet scan.
+#
+# KNOWN_IPS=(192.168.1.50 192.168.1.51)
+
+KNOWN_IPS=()
