@@ -59,13 +59,13 @@ DELETE_DIRS=(
   /vendor/app/RkApkinstaller
 )
 
-# Known-good lightweight replacements, installed from local APK files you provide
-# (see "Install essentials" in the README — these are not bundled in this repo).
-ESSENTIAL_APK_HINTS=(
-  "cclauncher*.apk        -> lightweight launcher"
-  "fdroid*.apk            -> F-Droid, for sideloading updates later"
-  "nspanelpro-tools*.apk  -> NSPanel Pro Tools (community)"
-)
+# Known-good lightweight replacements. "Install essentials" can fetch these
+# straight from their own official sources, or you can drop any .apk into
+# $APK_DIR yourself — see the README.
+#   name              | local filename          | source
+FDROID_URL="https://f-droid.org/F-Droid.apk"
+FDROID_API="https://f-droid.org/api/v1/packages/com.eblan.launcher"
+NSPANELPRO_TOOLS_API="https://api.github.com/repos/seaky/nspanel_pro_tools_apk/releases/latest"
 
 KEEP_HINT="Home Assistant / launcher / NSPanel Pro Tools are left untouched."
 
@@ -348,12 +348,75 @@ cmd_delete_system() {
   echo "Purge finished (check PURGE_DONE above). A reboot is recommended."
 }
 
+# --- essentials: fetch from official sources ------------------------------
+# This repo bundles no APKs. Each fetcher hits the project's own official
+# endpoint, prints the exact URL before downloading, and only runs after an
+# explicit per-item confirmation in cmd_install_essentials.
+
+fetch_fdroid_client() {
+  echo "Source: $FDROID_URL (F-Droid's own official download link)"
+  curl -fL --progress-bar "$FDROID_URL" -o "$APK_DIR/fdroid.apk"
+}
+
+fetch_eblan_launcher() {
+  echo "Source: $FDROID_API (F-Droid API, to resolve the latest version)"
+  local json vcode
+  json=$(curl -fsL "$FDROID_API") || { echo "lookup failed"; return 1; }
+  vcode=$(printf '%s' "$json" | grep -o '"suggestedVersionCode":[0-9]*' | head -1 | grep -o '[0-9]*$')
+  [[ -n "$vcode" ]] || { echo "could not parse the latest version code"; return 1; }
+  local url="https://f-droid.org/repo/com.eblan.launcher_${vcode}.apk"
+  echo "Source: $url"
+  curl -fL --progress-bar "$url" -o "$APK_DIR/eblan-launcher.apk"
+}
+
+fetch_nspanelpro_tools() {
+  echo "Source: $NSPANELPRO_TOOLS_API (GitHub API, latest release by seaky)"
+  local json url
+  json=$(curl -fsL "$NSPANELPRO_TOOLS_API") || { echo "lookup failed"; return 1; }
+  url=$(printf '%s' "$json" | grep -o '"browser_download_url"[[:space:]]*:[[:space:]]*"[^"]*\.apk"' \
+    | head -1 | sed -E 's/.*"(https[^"]*)"/\1/')
+  [[ -n "$url" ]] || { echo "could not find an .apk asset in the latest release"; return 1; }
+  echo "Source: $url"
+  curl -fL --progress-bar "$url" -o "$APK_DIR/nspanelpro-tools.apk"
+}
+
+offer_fetch_essentials() {
+  mkdir -p "$APK_DIR"
+  if ! command -v curl >/dev/null; then
+    echo "curl not found — download essentials manually (see README) into $APK_DIR"
+    return 0
+  fi
+  local spec name file fetcher
+  for spec in \
+    "F-Droid client|fdroid.apk|fetch_fdroid_client" \
+    "eblan launcher (com.eblan.launcher, via F-Droid)|eblan-launcher.apk|fetch_eblan_launcher" \
+    "NSPanel Pro Tools (seaky/nspanel_pro_tools_apk)|nspanelpro-tools.apk|fetch_nspanelpro_tools"
+  do
+    IFS='|' read -r name file fetcher <<<"$spec"
+    if [[ -f "$APK_DIR/$file" ]]; then
+      echo "  [already have it] $name -> $file"
+      continue
+    fi
+    printf "Fetch %s? [y/N]: " "$name"
+    read -r ans
+    [[ "$ans" =~ ^[yY]$ ]] || continue
+    if is_dry; then
+      note_dry "$fetcher -> $APK_DIR/$file"
+      continue
+    fi
+    "$fetcher" || echo "  fetch failed for $name — grab it manually (see README)"
+  done
+}
+
 cmd_install_essentials() {
   pick_device || return 1
-  echo "Installs lightweight replacements from local APK files in: $APK_DIR"
-  echo "(this repo does not bundle any APKs — you provide your own, see README):"
-  local hint
-  for hint in "${ESSENTIAL_APK_HINTS[@]}"; do echo "  $hint"; done
+  echo "Essentials this script can fetch from their own official sources:"
+  echo "  - F-Droid client:   $FDROID_URL"
+  echo "  - eblan launcher:   F-Droid package com.eblan.launcher"
+  echo "  - NSPanel Pro Tools: github.com/seaky/nspanel_pro_tools_apk (latest release)"
+  echo "Anything else you want installed: drop a .apk into $APK_DIR yourself."
+  echo
+  offer_fetch_essentials
   echo
 
   if [[ ! -d "$APK_DIR" ]]; then

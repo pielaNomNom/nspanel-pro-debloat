@@ -150,16 +150,21 @@ mode (`su -mm -c '...'`), which is what actually works.
 
 ## Install essentials (optional)
 
-Option **7** installs whatever `.apk` files you drop into `./apks/`
-(gitignored, not bundled with this repo — grab them from your own
-trusted source):
+Option **7** can fetch three known-good lightweight replacements
+straight from their own official sources (each one asks for
+confirmation and prints the exact URL before downloading anything):
 
-- a lightweight launcher (e.g. a minimal home-screen replacement)
-- F-Droid, if you want a way to sideload/update other apps later
-- NSPanel Pro Tools, if it's not already on your panel
+| App | Source |
+|-----|--------|
+| [eblan launcher](https://f-droid.org/packages/com.eblan.launcher/) | F-Droid (`com.eblan.launcher`) — resolved via the F-Droid API to the latest version |
+| [F-Droid client](https://f-droid.org/F-Droid.apk) | F-Droid's own official download link |
+| [NSPanel Pro Tools](https://github.com/seaky/nspanel_pro_tools_apk) | Latest GitHub release from [seaky/nspanel_pro_tools_apk](https://github.com/seaky/nspanel_pro_tools_apk) |
 
-This repo intentionally does **not** ship or auto-download any
-third-party APKs — you choose where those come from.
+Downloaded files land in `./apks/` (gitignored — this repo does not
+bundle or ship any third-party APKs itself). You can also drop any other
+`.apk` in there yourself — anything found in that folder gets offered
+for install on the selected panel. Requires `curl`; without it, download
+the files manually from the links above and place them in `./apks/`.
 
 ## Reverting
 
